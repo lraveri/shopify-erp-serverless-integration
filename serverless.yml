@@ -9,6 +9,15 @@ provider:
   name: aws
   runtime: nodejs20.x
   region: eu-central-1
+  environment:
+    ORDER_QUEUE_URL:
+      Ref: OrderQueue
+  iamRoleStatements:
+    - Effect: Allow
+      Action:
+        - sqs:SendMessage
+      Resource:
+        - arn:aws:sqs:${self:provider.region}:${aws:accountId}:OrderQueue
 
 functions:
   receiveWebhook:
@@ -17,6 +26,20 @@ functions:
       - http:
           path: webhook/order
           method: post
+
+  processOrder:
+    handler: handler.processOrder
+    events:
+      - sqs:
+          arn:
+            Fn::GetAtt: [OrderQueue, Arn]
+
+resources:
+  Resources:
+    OrderQueue:
+      Type: AWS::SQS::Queue
+      Properties:
+        QueueName: OrderQueue
 
 plugins:
   - serverless-offline
