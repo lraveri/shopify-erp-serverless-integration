@@ -3,7 +3,7 @@
 const AWS = require('aws-sdk');
 const secretsManager = new AWS.SecretsManager();
 
-const getWebhookSecret = async () => {
+const getWebhookSecret = () => {
   return process.env.WEBHOOK_SIGNATURE;
 };
 
