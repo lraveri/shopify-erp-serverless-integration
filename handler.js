@@ -4,19 +4,14 @@ const AWS = require('aws-sdk');
 const secretsManager = new AWS.SecretsManager();
 
 const getWebhookSecret = async () => {
-  const params = {
-    SecretId: "webhook-signature"
-  };
-  const secretValue = await secretsManager.getSecretValue(params).promise();
-
-  return JSON.parse(secretValue.SecretString)["webhook-signature"];
+  return process.env.WEBHOOK_SIGNATURE;
 };
 
 module.exports.webhook = async (event) => {
   console.log('Received Webhook Event:', event);
 
   try {
-    const webhookSecret = process.env.WEBHOOK_SIGNATURE;
+    const webhookSecret = getWebhookSecret();
     console.log('Webhook Secret:', webhookSecret);
 
     // Log the body of the event (webhook data)

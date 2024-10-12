@@ -18,15 +18,6 @@ functions:
           path: webhook/order
           method: post
 
-resources:
-  Resources:
-    WebhookSecret:
-      Type: "AWS::SecretsManager::Secret"
-      Properties:
-        Name: "webhook-signature"
-        Description: "Secret for Shopify webhook signature"
-        SecretString: '{"webhook_signature": "${env:WEBHOOK_SIGNATURE}"}'
-
 plugins:
   - serverless-offline
   - serverless-dotenv-plugin
