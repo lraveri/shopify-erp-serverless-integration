@@ -8,11 +8,12 @@ service: shopify-erp-serverless-integration
 provider:
   name: aws
   runtime: nodejs20.x
+  region: eu-central-1
 
 functions:
-  hello:
-    handler: handler.hello
+  receiveWebhook:
+    handler: handler.webhook
     events:
-      - httpApi:
-          path: /
-          method: get
+      - http:
+          path: webhook/order
+          method: post
