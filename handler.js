@@ -1,15 +1,50 @@
 'use strict';
 
 const AWS = require('aws-sdk');
+const zlib = require('zlib');
 const sqs = new AWS.SQS();
 const dynamodb = new AWS.DynamoDB.DocumentClient();
+const sns = new AWS.SNS();
 
-// Funzione per ottenere il segreto dal process.env
+module.exports.notifyError = async (event) => {
+    console.log('Received CloudWatch Log Event:', event);
+
+    try {
+        // Decodifica i log da Base64
+        const logData = Buffer.from(event.awslogs.data, 'base64');
+
+        // Decomprime i log
+        const decompressedData = zlib.gunzipSync(logData);
+
+        // Converte i log decompressi in una stringa
+        const logString = decompressedData.toString('utf8');
+
+        // Analizza il JSON dai log
+        const parsedLog = JSON.parse(logString);
+
+        // Estrai il messaggio di errore
+        const errorMessage = parsedLog.logEvents[0].message;
+        console.log('Error message:', errorMessage);
+
+        // Invia la notifica tramite SNS
+        const params = {
+            Message: `Errore rilevato: ${errorMessage}`,
+            Subject: 'Errore Lambda ProcessOrder',
+            TopicArn: process.env.ERROR_ALERT_TOPIC_ARN,  // Inserisci l'ARN del topic SNS
+        };
+
+        await sns.publish(params).promise();
+        console.log('Error notification sent via SNS.');
+
+    } catch (error) {
+        console.error('Error processing log event:', error);
+    }
+};
+
 const getWebhookSecret = () => {
     return process.env.WEBHOOK_SIGNATURE;
 };
 
-// Funzione per inviare il messaggio alla coda SQS
 const sendMessageToQueue = async (messageBody) => {
     const params = {
         QueueUrl: process.env.ORDER_QUEUE_URL,  // La coda SQS creata nel serverless.yml
@@ -18,7 +53,6 @@ const sendMessageToQueue = async (messageBody) => {
     await sqs.sendMessage(params).promise();
 };
 
-// Funzione per controllare se l'ordine è già stato elaborato
 const checkOrderExists = async (orderId) => {
     const params = {
         TableName: process.env.DYNAMODB_TABLE,
@@ -30,7 +64,6 @@ const checkOrderExists = async (orderId) => {
     return result.Item !== undefined;  // Restituisce `true` se l'ordine esiste già
 };
 
-// Funzione per salvare l'ordine in DynamoDB con TTL
 const saveOrder = async (orderId) => {
     const ttl = Math.floor(Date.now() / 1000) + 30 * 24 * 60 * 60;  // Imposta il TTL a 30 giorni nel futuro
 
@@ -39,20 +72,18 @@ const saveOrder = async (orderId) => {
         Item: {
             orderId: orderId,
             timestamp: new Date().toISOString(),
-            ttl: ttl,  // Aggiungi il campo TTL per l'eliminazione automatica
+            ttl: ttl,
         },
     };
     await dynamodb.put(params).promise();
 };
 
-// Funzione che gestisce l'elaborazione dell'ordine
 module.exports.processOrder = async (event) => {
     console.log('Received Order Event:', event);
 
     try {
         const records = event.Records;
 
-        // Elabora ogni record ricevuto dalla coda SQS
         for (const record of records) {
             const messageBody = JSON.parse(record.body);
             const orderId = messageBody.orderId;
@@ -101,7 +132,6 @@ module.exports.processOrder = async (event) => {
     }
 };
 
-// Funzione che gestisce il webhook e invia i dati alla coda SQS
 module.exports.webhook = async (event) => {
     console.log('Received Webhook Event:', event);
 
@@ -127,7 +157,7 @@ module.exports.webhook = async (event) => {
         await sendMessageToQueue(body);
         console.log('Webhook data sent to SQS:', body);
 
-        // Rispondi subito con 200 OK
+        // Risponde con 200 OK
         return {
             statusCode: 200,
             body: JSON.stringify({

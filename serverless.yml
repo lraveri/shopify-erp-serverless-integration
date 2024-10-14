@@ -15,15 +15,19 @@ provider:
     ORDER_QUEUE_URL:
       Ref: OrderQueue
     DYNAMODB_TABLE: OrderTable
+    ERROR_ALERT_TOPIC_ARN:
+      Ref: MyAlertTopic  # Correzione della referenza per il topic SNS
   iamRoleStatements:
     - Effect: Allow
       Action:
         - sqs:SendMessage
         - dynamodb:PutItem
         - dynamodb:GetItem
+        - sns:Publish  # Permesso per inviare notifiche via SNS
       Resource:
         - arn:aws:sqs:${self:provider.region}:${aws:accountId}:OrderQueue
         - arn:aws:dynamodb:${self:provider.region}:${aws:accountId}:table/OrderTable
+        - arn:aws:sns:${self:provider.region}:${aws:accountId}:lambda-error-alert-topic  # Correzione della risorsa SNS
 
 functions:
   receiveWebhook:
@@ -39,6 +43,13 @@ functions:
       - sqs:
           arn:
             Fn::GetAtt: [OrderQueue, Arn]
+
+  errorNotifier:
+    handler: handler.notifyError
+    events:
+      - cloudwatchLog:
+          logGroup: /aws/lambda/${self:service}-${self:provider.stage}-processOrder
+          filter: '"ERROR"'  # Filtro per catturare gli errori nei log
 
 useDotenv: true
 
@@ -58,10 +69,10 @@ resources:
             AttributeType: S
         KeySchema:
           - AttributeName: orderId
-            KeyType: HASH  # La chiave primaria sarà l'ID dell'ordine
+            KeyType: HASH
         BillingMode: PAY_PER_REQUEST
-        TimeToLiveSpecification: # Configura il TTL
-          AttributeName: ttl  # Attributo utilizzato per il TTL
+        TimeToLiveSpecification:
+          AttributeName: ttl
           Enabled: true
 
     ProcessOrderLogGroup:
@@ -74,7 +85,7 @@ resources:
       Type: AWS::Logs::MetricFilter
       Properties:
         LogGroupName: /aws/lambda/${self:service}-${self:provider.stage}-processOrder
-        FilterPattern: '"ERROR"'  # Cerca il pattern 'ERROR' nei log
+        FilterPattern: '"ERROR"'
         MetricTransformations:
           - MetricValue: 1
             MetricNamespace: "ProcessOrderErrors"
@@ -90,7 +101,7 @@ resources:
         Statistic: Sum
         Period: 300
         EvaluationPeriods: 1
-        Threshold: 1  # Trigger allarme se si verifica almeno 1 errore in un intervallo di 5 minuti
+        Threshold: 1
         ComparisonOperator: GreaterThanOrEqualToThreshold
         AlarmActions:
           - Ref: MyAlertTopic
@@ -103,10 +114,7 @@ resources:
     MyAlertSubscription:
       Type: AWS::SNS::Subscription
       Properties:
-        Protocol: email  # Imposta il protocollo a email
-        Endpoint: lucaraveri993@gmail.com  # Inserisci il tuo indirizzo email
+        Protocol: email
+        Endpoint: lucaraveri993@gmail.com
         TopicArn:
           Ref: MyAlertTopic
-
-plugins:
-  - serverless-offline
