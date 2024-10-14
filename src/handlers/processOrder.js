@@ -30,55 +30,69 @@ const checkOrderExists = async (orderId) => {
 };
 
 module.exports.handler = async (event) => {
-    console.log('Received Order Event:', event);
+    const records = event.Records;
 
-    try {
-        const records = event.Records;
-
-        for (const record of records) {
+    for (const record of records) {
+        try {
             const messageBody = JSON.parse(record.body);
             const orderId = messageBody.orderId;
-            const uuid = messageBody.uuid;  // Recupera l'UUID passato dal webhook
+            const uuid = messageBody.uuid;
 
-            console.log(`Processing order with UUID: ${uuid} - Order ID: ${orderId}`);
+            console.log(JSON.stringify({
+                message: 'Processing order',
+                record: record,
+                uuid: uuid,
+            }));
 
             const orderExists = await checkOrderExists(orderId);
 
             if (orderExists) {
-                console.log(`Order ${orderId} already processed, skipping (UUID: ${uuid}).`);
+                console.log(JSON.stringify({
+                    message: `Order ${orderId} already processed, skipping (UUID: ${uuid}).`,
+                    record: record,
+                    uuid: uuid,
+                }));
                 continue;
             }
 
-            // Salva l'ordine nella tabella DynamoDB
             await saveOrder(orderId);
-            console.log(`Order ${orderId} saved to DynamoDB (UUID: ${uuid}).`);
+            console.log(JSON.stringify({
+                message: `Order ${orderId} saved to DynamoDB (UUID: ${uuid}).`,
+                record: record,
+                uuid: uuid,
+            }));
 
-            // Logica di elaborazione dell'ordine (aggiungi la tua logica qui)
-            console.log(`Order processing logic for UUID: ${uuid}`);
+            console.log(JSON.stringify({
+                message: `Order processing logic for UUID: ${uuid}`,
+                record: record,
+                uuid: uuid,
+            }));
 
-            // Elimina il messaggio dalla coda SQS
             const deleteParams = {
                 QueueUrl: process.env.ORDER_QUEUE_URL,
                 ReceiptHandle: record.receiptHandle,
             };
             await sqs.deleteMessage(deleteParams).promise();
-            console.log(`SQS Message deleted for UUID: ${uuid}`);
+            console.log(JSON.stringify({
+                message: `SQS Message deleted for UUID: ${uuid}`,
+                record: record,
+                uuid: uuid,
+            }));
+
+        } catch (error) {
+            console.error(JSON.stringify({
+                message: 'Error processing record',
+                record: record,
+                error: error.message,
+                uuid: record.uuid || 'UUID not available'
+            }));
         }
-
-        return {
-            statusCode: 200,
-            body: JSON.stringify({
-                message: 'Order processed successfully.',
-            }),
-        };
-    } catch (error) {
-        console.error('Error processing order:', error);
-
-        return {
-            statusCode: 500,
-            body: JSON.stringify({
-                message: 'Internal Server Error',
-            }),
-        };
     }
+
+    return {
+        statusCode: 200,
+        body: JSON.stringify({
+            message: 'Records processed successfully.',
+        }),
+    };
 };
