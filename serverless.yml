@@ -34,6 +34,8 @@ functions:
           arn:
             Fn::GetAtt: [OrderQueue, Arn]
 
+useDotenv: true
+
 resources:
   Resources:
     OrderQueue:
@@ -43,4 +45,3 @@ resources:
 
 plugins:
   - serverless-offline
-  - serverless-dotenv-plugin
