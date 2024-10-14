@@ -10,6 +10,7 @@ provider:
   runtime: nodejs20.x
   region: eu-central-1
   environment:
+    WEBHOOK_SIGNATURE: ${env:WEBHOOK_SIGNATURE}
     ORDER_QUEUE_URL:
       Ref: OrderQueue
   iamRoleStatements:
