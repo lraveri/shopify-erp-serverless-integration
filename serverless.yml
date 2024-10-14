@@ -16,40 +16,40 @@ provider:
       Ref: OrderQueue
     DYNAMODB_TABLE: OrderTable
     ERROR_ALERT_TOPIC_ARN:
-      Ref: MyAlertTopic  # Correzione della referenza per il topic SNS
+      Ref: ErrorNotificationTopic
   iamRoleStatements:
     - Effect: Allow
       Action:
         - sqs:SendMessage
         - dynamodb:PutItem
         - dynamodb:GetItem
-        - sns:Publish  # Permesso per inviare notifiche via SNS
+        - sns:Publish
       Resource:
         - arn:aws:sqs:${self:provider.region}:${aws:accountId}:OrderQueue
         - arn:aws:dynamodb:${self:provider.region}:${aws:accountId}:table/OrderTable
-        - arn:aws:sns:${self:provider.region}:${aws:accountId}:lambda-error-alert-topic  # Correzione della risorsa SNS
+        - arn:aws:sns:${self:provider.region}:${aws:accountId}:lambda-error-notification-topic
 
 functions:
   receiveWebhook:
-    handler: handler.webhook
+    handler: src/handlers/handleWebhook.handler
     events:
       - http:
           path: webhook/order
           method: post
 
   processOrder:
-    handler: handler.processOrder
+    handler: src/handlers/processOrder.handler
     events:
       - sqs:
           arn:
             Fn::GetAtt: [OrderQueue, Arn]
 
   errorNotifier:
-    handler: handler.notifyError
+    handler: src/handlers/notifyError.handler
     events:
       - cloudwatchLog:
           logGroup: /aws/lambda/${self:service}-${self:provider.stage}-processOrder
-          filter: '"ERROR"'  # Filtro per catturare gli errori nei log
+          filter: '"ERROR"'
 
 useDotenv: true
 
@@ -75,46 +75,15 @@ resources:
           AttributeName: ttl
           Enabled: true
 
-    ProcessOrderLogGroup:
-      Type: AWS::Logs::LogGroup
-      Properties:
-        LogGroupName: /aws/lambda/${self:service}-${self:provider.stage}-processOrder
-        RetentionInDays: 14
-
-    ProcessOrderErrorMetricFilter:
-      Type: AWS::Logs::MetricFilter
-      Properties:
-        LogGroupName: /aws/lambda/${self:service}-${self:provider.stage}-processOrder
-        FilterPattern: '"ERROR"'
-        MetricTransformations:
-          - MetricValue: 1
-            MetricNamespace: "ProcessOrderErrors"
-            MetricName: "LambdaErrorCount"
-
-    ProcessOrderErrorAlarm:
-      Type: AWS::CloudWatch::Alarm
-      Properties:
-        AlarmName: ProcessOrderErrorAlarm
-        AlarmDescription: "Allarme per errori nella funzione Lambda processOrder"
-        Namespace: "ProcessOrderErrors"
-        MetricName: "LambdaErrorCount"
-        Statistic: Sum
-        Period: 300
-        EvaluationPeriods: 1
-        Threshold: 1
-        ComparisonOperator: GreaterThanOrEqualToThreshold
-        AlarmActions:
-          - Ref: MyAlertTopic
-
-    MyAlertTopic:
+    ErrorNotificationTopic:
       Type: AWS::SNS::Topic
       Properties:
-        TopicName: lambda-error-alert-topic
+        TopicName: lambda-error-notification-topic
 
-    MyAlertSubscription:
+    ErrorNotificationSubscription:
       Type: AWS::SNS::Subscription
       Properties:
         Protocol: email
         Endpoint: lucaraveri993@gmail.com
         TopicArn:
-          Ref: MyAlertTopic
+          Ref: ErrorNotificationTopic
