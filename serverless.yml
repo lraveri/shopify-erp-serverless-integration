@@ -9,6 +9,7 @@ provider:
   name: aws
   runtime: nodejs20.x
   region: eu-central-1
+  stage: dev
   environment:
     WEBHOOK_SIGNATURE: ${env:WEBHOOK_SIGNATURE}
     ORDER_QUEUE_URL:
@@ -62,6 +63,50 @@ resources:
         TimeToLiveSpecification: # Configura il TTL
           AttributeName: ttl  # Attributo utilizzato per il TTL
           Enabled: true
+
+    ProcessOrderLogGroup:
+      Type: AWS::Logs::LogGroup
+      Properties:
+        LogGroupName: /aws/lambda/${self:service}-${self:provider.stage}-processOrder
+        RetentionInDays: 14
+
+    ProcessOrderErrorMetricFilter:
+      Type: AWS::Logs::MetricFilter
+      Properties:
+        LogGroupName: /aws/lambda/${self:service}-${self:provider.stage}-processOrder
+        FilterPattern: '"ERROR"'  # Cerca il pattern 'ERROR' nei log
+        MetricTransformations:
+          - MetricValue: 1
+            MetricNamespace: "ProcessOrderErrors"
+            MetricName: "LambdaErrorCount"
+
+    ProcessOrderErrorAlarm:
+      Type: AWS::CloudWatch::Alarm
+      Properties:
+        AlarmName: ProcessOrderErrorAlarm
+        AlarmDescription: "Allarme per errori nella funzione Lambda processOrder"
+        Namespace: "ProcessOrderErrors"
+        MetricName: "LambdaErrorCount"
+        Statistic: Sum
+        Period: 300
+        EvaluationPeriods: 1
+        Threshold: 1  # Trigger allarme se si verifica almeno 1 errore in un intervallo di 5 minuti
+        ComparisonOperator: GreaterThanOrEqualToThreshold
+        AlarmActions:
+          - Ref: MyAlertTopic
+
+    MyAlertTopic:
+      Type: AWS::SNS::Topic
+      Properties:
+        TopicName: lambda-error-alert-topic
+
+    MyAlertSubscription:
+      Type: AWS::SNS::Subscription
+      Properties:
+        Protocol: email  # Imposta il protocollo a email
+        Endpoint: lucaraveri993@gmail.com  # Inserisci il tuo indirizzo email
+        TopicArn:
+          Ref: MyAlertTopic
 
 plugins:
   - serverless-offline
