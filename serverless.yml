@@ -13,12 +13,16 @@ provider:
     WEBHOOK_SIGNATURE: ${env:WEBHOOK_SIGNATURE}
     ORDER_QUEUE_URL:
       Ref: OrderQueue
+    DYNAMODB_TABLE: OrderTable
   iamRoleStatements:
     - Effect: Allow
       Action:
         - sqs:SendMessage
+        - dynamodb:PutItem
+        - dynamodb:GetItem
       Resource:
         - arn:aws:sqs:${self:provider.region}:${aws:accountId}:OrderQueue
+        - arn:aws:dynamodb:${self:provider.region}:${aws:accountId}:table/OrderTable
 
 functions:
   receiveWebhook:
@@ -43,6 +47,21 @@ resources:
       Type: AWS::SQS::Queue
       Properties:
         QueueName: OrderQueue
+
+    OrderTable:
+      Type: AWS::DynamoDB::Table
+      Properties:
+        TableName: OrderTable
+        AttributeDefinitions:
+          - AttributeName: orderId
+            AttributeType: S
+        KeySchema:
+          - AttributeName: orderId
+            KeyType: HASH  # La chiave primaria sarà l'ID dell'ordine
+        BillingMode: PAY_PER_REQUEST
+        TimeToLiveSpecification: # Configura il TTL
+          AttributeName: ttl  # Attributo utilizzato per il TTL
+          Enabled: true
 
 plugins:
   - serverless-offline
