@@ -1,69 +1,32 @@
-<!--
-title: 'AWS Simple HTTP Endpoint example in NodeJS'
-description: 'This template demonstrates how to make a simple HTTP API with Node.js running on AWS Lambda and API Gateway using the Serverless Framework.'
-layout: Doc
-framework: v4
-platform: AWS
-language: nodeJS
-authorLink: 'https://github.com/serverless'
-authorName: 'Serverless, Inc.'
-authorAvatar: 'https://avatars1.githubusercontent.com/u/13742415?s=200&v=4'
--->
+# Case Study: Building a Custom Serverless Integration Between an E-commerce Platform and an ERP on AWS
 
-# Serverless Framework Node HTTP API on AWS
+When building an integration between an e-commerce platform and another system for example a CRM or an ERP, one of the key advantages is flexibility. A custom solution allows for precise control over how data is transferred, mapped, and processed. However, the downside is increased complexity and higher development and maintenance costs, including infrastructure management.
 
-This template demonstrates how to make a simple HTTP API with Node.js running on AWS Lambda and API Gateway using the Serverless Framework.
+A serverless architecture can help mitigate some of these challenges. With serverless, you benefit from a pay-per-use model, which eliminates the need for managing servers and reduces infrastructure costs. Additionally, serverless solutions scale automatically to handle varying loads, making them highly adaptable.
 
-This template does not include any kind of persistence (database). For more advanced examples, check out the [serverless/examples repository](https://github.com/serverless/examples/) which includes Typescript, Mongo, DynamoDB and other examples.
+Using a framework like Serverless Framework further simplifies the process. It allows developers to focus on writing code while handling much of the deployment and resource provisioning through Infrastructure as Code. This reduces the overhead of managing cloud infrastructure and speeds up the development cycle, leading to faster delivery.
 
-## Usage
 
-### Deployment
+## Scenario Description
 
-In order to deploy the example, you need to run the following command:
+In our case, the e-commerce platform is Shopify, and the system we’re integrating with is Netsuite, an ERP used for managing business processes such as finance, operations, and customer relations. The goal is to keep orders and customer data synchronized between Shopify and Netsuite.
 
-```
-serverless deploy
-```
+We can leverage Shopify’s webhooks, which are automated messages sent from one app to another. A webhook is triggered whenever a specific event occurs—in this case, when an order is created or when a customer is created or updated.
 
-After running deploy, you should see output similar to:
+Netsuite provides custom APIs that allow us to create orders and upsert (create or update) customer records. Netsuite, however, comes with some constraints. For instance, it can process a maximum of 5 API calls at a time. Additionally, if two orders or customers with the same Id are sent to Netsuite in a short period, there’s a risk of creating duplicates.
 
-```
-Deploying "serverless-http-api" to stage "dev" (us-east-1)
+## Reference Architecture
 
-✔ Service deployed to stack serverless-http-api-dev (91s)
+In this solution, we’ve designed a robust, scalable, and cost-efficient integration between Shopify and Netsuite using AWS serverless services.
 
-endpoint: GET - https://xxxxxxxxxx.execute-api.us-east-1.amazonaws.com/
-functions:
-  hello: serverless-http-api-dev-hello (1.6 kB)
-```
+The process starts when a webhook from Shopify is triggered, for example, when a new order is placed or a customer is created or updated. This webhook hits an API Gateway, which is the entry point for our system. The API Gateway then invokes a Lambda function that handles the initial processing. The Lambda performs an authorization check to ensure that only valid requests are processed. Once validated, the payload is dispatched to an SQS queue, which acts as a buffer, allowing us to control the flow of data into Netsuite.
 
-_Note_: In current form, after deployment, your API is public and can be invoked by anyone. For production deployments, you might want to configure an authorizer. For details on how to do that, refer to [HTTP API (API Gateway V2) event docs](https://www.serverless.com/framework/docs/providers/aws/events/http-api).
+Each job in the SQS queue processes one record at a time. This is crucial because Netsuite can only handle 5 concurrent API calls, so processing jobs sequentially helps us avoid overwhelming the system. Before each job is processed, we check a DynamoDB table to see if the order ID or customer ID has already been logged. This prevents duplicate records from being created, which is essential given that Netsuite has no built-in protection against duplicate entries when multiple similar requests come in quickly.
 
-### Invocation
+Once a job is ready for processing, the necessary field mappings between Shopify and Netsuite are applied. The Lambda then calls Netsuite’s custom API to either create or update (upsert) the relevant order or customer.
 
-After successful deployment, you can call the created application via HTTP:
+Throughout the entire process, all events are logged in CloudWatch, giving us full visibility into the system’s behavior. We’ve set up CloudWatch Insights queries to monitor key metrics and performance. In the case of any errors, CloudWatch alerts are configured to send immediate notifications via email, ensuring that issues are quickly identified and resolved.
 
-```
-curl https://xxxxxxx.execute-api.us-east-1.amazonaws.com/
-```
+Finally, security is a top priority. All sensitive information, such as API credentials for Netsuite, is securely stored in AWS Secrets Manager. This ensures that credentials are managed safely, eliminating the risk of exposure through hard-coded secrets or environment variables.
 
-Which should result in response similar to:
-
-```json
-{ "message": "Go Serverless v4! Your function executed successfully!" }
-```
-
-### Local development
-
-The easiest way to develop and test your function is to use the `dev` command:
-
-```
-serverless dev
-```
-
-This will start a local emulator of AWS Lambda and tunnel your requests to and from AWS Lambda, allowing you to interact with your function as if it were running in the cloud.
-
-Now you can invoke the function as before, but this time the function will be executed locally. Now you can develop your function locally, invoke it, and see the results immediately without having to re-deploy.
-
-When you are done developing, don't forget to run `serverless deploy` to deploy the function to the cloud.
+This architecture provides you with a solution that is highly scalable, with minimal operational overhead, while ensuring data integrity and system reliability.
