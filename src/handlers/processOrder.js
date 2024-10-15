@@ -30,71 +30,84 @@ const checkOrderExists = async (orderId) => {
 };
 
 module.exports.handler = async (event) => {
-    const records = event.Records;
+    const record = event.Records[0];
 
-    for (const record of records) {
-        try {
-            const messageBody = JSON.parse(record.body);
-            const orderId = messageBody.orderId;
-            const uuid = messageBody.uuid;
+    try {
+        const messageBody = JSON.parse(record.body);
+        const orderId = messageBody.orderId;
+        const uuid = messageBody.uuid;
 
+        console.log(JSON.stringify({
+            message: 'Processing order',
+            uuid: uuid,
+            orderId: orderId,
+        }));
+
+        const orderExists = await checkOrderExists(orderId);
+
+        if (orderExists) {
             console.log(JSON.stringify({
-                message: 'Processing order',
-                record: record,
+                message: `Order ${orderId} already processed, skipping (UUID: ${uuid}).`,
                 uuid: uuid,
+                orderId: orderId,
             }));
-
-            const orderExists = await checkOrderExists(orderId);
-
-            if (orderExists) {
-                console.log(JSON.stringify({
-                    message: `Order ${orderId} already processed, skipping (UUID: ${uuid}).`,
-                    record: record,
-                    uuid: uuid,
-                }));
-                continue;
-            }
-
-            await saveOrder(orderId);
-            console.log(JSON.stringify({
-                message: `Order ${orderId} saved to DynamoDB (UUID: ${uuid}).`,
-                record: record,
-                uuid: uuid,
-            }));
-
-            console.log(JSON.stringify({
-                message: `Order processing logic for UUID: ${uuid}`,
-                record: record,
-                uuid: uuid,
-            }));
-
-            const deleteParams = {
-                QueueUrl: process.env.ORDER_QUEUE_URL,
-                ReceiptHandle: record.receiptHandle,
+            return {
+                statusCode: 200,
+                body: JSON.stringify({
+                    message: `Order ${orderId} already processed, skipping.`,
+                }),
             };
-            await sqs.deleteMessage(deleteParams).promise();
-            console.log(JSON.stringify({
-                message: `SQS Message deleted for UUID: ${uuid}`,
-                record: record,
-                uuid: uuid,
-            }));
-
-        } catch (error) {
-            const messageBody = JSON.parse(record.body);
-            const uuid = messageBody.uuid;
-            console.error(JSON.stringify({
-                message: 'Error processing record',
-                record: record,
-                error: error.message,
-                uuid: uuid || 'UUID not available'
-            }));
         }
-    }
 
-    return {
-        statusCode: 200,
-        body: JSON.stringify({
-            message: 'Records processed successfully.',
-        }),
-    };
+        await saveOrder(orderId);
+        console.log(JSON.stringify({
+            message: `Order ${orderId} saved to DynamoDB (UUID: ${uuid}).`,
+            uuid: uuid,
+            orderId: orderId,
+        }));
+
+        console.log(JSON.stringify({
+            message: `Order processing logic for UUID: ${uuid}`,
+            uuid: uuid,
+            orderId: orderId,
+        }));
+
+        const deleteParams = {
+            QueueUrl: process.env.ORDER_QUEUE_URL,
+            ReceiptHandle: record.receiptHandle,
+        };
+        await sqs.deleteMessage(deleteParams).promise();
+        console.log(JSON.stringify({
+            message: `SQS Message deleted for UUID: ${uuid}`,
+            uuid: uuid,
+            orderId: orderId,
+        }));
+
+        return {
+            statusCode: 200,
+            body: JSON.stringify({
+                message: 'Order processed successfully.',
+            }),
+        };
+
+    } catch (error) {
+        const messageBody = JSON.parse(record.body);
+        const uuid = messageBody.uuid;
+        console.error(JSON.stringify({
+            message: 'Error processing order',
+            uuid: uuid || 'UUID not available',
+            orderId: messageBody.orderId || 'OrderId not available',
+            error: error.message,
+        }));
+
+        return {
+            statusCode: 500,
+            body: JSON.stringify({
+                message: 'Internal Server Error',
+                error: error.message,
+                uuid: uuid || 'UUID not available',
+                orderId: messageBody.orderId || 'OrderId not available'
+            }),
+        };
+    }
 };

@@ -43,6 +43,7 @@ functions:
       - sqs:
           arn:
             Fn::GetAtt: [OrderQueue, Arn]
+          batchSize: 1
 
   errorNotifier:
     handler: src/handlers/notifyError.handler
