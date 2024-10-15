@@ -26,7 +26,10 @@ module.exports.handler = async (event) => {
         };
 
         await sns.publish(params).promise();
-        console.log(`Notification sent for UUID: ${extractedUUID} and error: ${extractedError}`);
+        console.log({
+            message: `Notification sent for UUID: ${extractedUUID} and error: ${extractedError}`,
+            uuid: uuidMatch
+        });
     } catch (error) {
         console.error('Error processing log event:', error);
     }

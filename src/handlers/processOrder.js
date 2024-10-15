@@ -37,20 +37,20 @@ module.exports.handler = async (event) => {
         const orderId = messageBody.orderId;
         const uuid = messageBody.uuid;
 
-        console.log(JSON.stringify({
+        console.log({
             message: 'Processing order',
             uuid: uuid,
             orderId: orderId,
-        }));
+        });
 
         const orderExists = await checkOrderExists(orderId);
 
         if (orderExists) {
-            console.log(JSON.stringify({
+            console.log({
                 message: `Order ${orderId} already processed, skipping (UUID: ${uuid}).`,
                 uuid: uuid,
                 orderId: orderId,
-            }));
+            });
             return {
                 statusCode: 200,
                 body: JSON.stringify({
@@ -60,28 +60,28 @@ module.exports.handler = async (event) => {
         }
 
         await saveOrder(orderId);
-        console.log(JSON.stringify({
+        console.log({
             message: `Order ${orderId} saved to DynamoDB (UUID: ${uuid}).`,
             uuid: uuid,
             orderId: orderId,
-        }));
+        });
 
-        console.log(JSON.stringify({
+        console.log({
             message: `Order processing logic for UUID: ${uuid}`,
             uuid: uuid,
             orderId: orderId,
-        }));
+        });
 
         const deleteParams = {
             QueueUrl: process.env.ORDER_QUEUE_URL,
             ReceiptHandle: record.receiptHandle,
         };
         await sqs.deleteMessage(deleteParams).promise();
-        console.log(JSON.stringify({
+        console.log({
             message: `SQS Message deleted for UUID: ${uuid}`,
             uuid: uuid,
             orderId: orderId,
-        }));
+        });
 
         return {
             statusCode: 200,
@@ -93,12 +93,12 @@ module.exports.handler = async (event) => {
     } catch (error) {
         const messageBody = JSON.parse(record.body);
         const uuid = messageBody.uuid;
-        console.error(JSON.stringify({
+        console.error({
             message: 'Error processing order',
             uuid: uuid || 'UUID not available',
             orderId: messageBody.orderId || 'OrderId not available',
             error: error.message,
-        }));
+        });
 
         return {
             statusCode: 500,

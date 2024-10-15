@@ -10,6 +10,9 @@ provider:
   runtime: nodejs20.x
   region: eu-central-1
   stage: dev
+  logs:
+    lambda:
+      logFormat: JSON
   environment:
     WEBHOOK_SIGNATURE: ${env:WEBHOOK_SIGNATURE}
     ORDER_QUEUE_URL:

@@ -24,12 +24,12 @@ module.exports.handler = async (event) => {
 
         const body = JSON.parse(event.body);
 
-        console.log(JSON.stringify({
+        console.log({
             message: 'Received Webhook Event',
             uuid: uuid,
             payload: body,
             headers: event.headers
-        }));
+        });
 
         body.uuid = uuid;
 
@@ -53,11 +53,11 @@ module.exports.handler = async (event) => {
             }),
         };
     } catch (error) {
-        console.error(JSON.stringify({
+        console.error({
             message: 'Error processing webhook',
             error: error,
             uuid: uuid,
-        }));
+        });
 
         return {
             statusCode: 500,
