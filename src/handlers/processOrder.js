@@ -80,11 +80,13 @@ module.exports.handler = async (event) => {
             }));
 
         } catch (error) {
+            const messageBody = JSON.parse(record.body);
+            const uuid = messageBody.uuid;
             console.error(JSON.stringify({
                 message: 'Error processing record',
                 record: record,
                 error: error.message,
-                uuid: record.uuid || 'UUID not available'
+                uuid: uuid || 'UUID not available'
             }));
         }
     }
