@@ -47,7 +47,7 @@ module.exports.handler = async (event) => {
 
         if (orderExists) {
             console.log({
-                message: `Order ${orderId} already processed, skipping (UUID: ${uuid}).`,
+                message: `Order already processed, skipping.`,
                 uuid: uuid,
                 orderId: orderId,
             });
@@ -60,14 +60,9 @@ module.exports.handler = async (event) => {
         }
 
         await saveOrder(orderId);
-        console.log({
-            message: `Order ${orderId} saved to DynamoDB (UUID: ${uuid}).`,
-            uuid: uuid,
-            orderId: orderId,
-        });
 
         console.log({
-            message: `Order processing logic for UUID: ${uuid}`,
+            message: `Processing order...`,
             uuid: uuid,
             orderId: orderId,
         });
@@ -77,11 +72,6 @@ module.exports.handler = async (event) => {
             ReceiptHandle: record.receiptHandle,
         };
         await sqs.deleteMessage(deleteParams).promise();
-        console.log({
-            message: `SQS Message deleted for UUID: ${uuid}`,
-            uuid: uuid,
-            orderId: orderId,
-        });
 
         return {
             statusCode: 200,

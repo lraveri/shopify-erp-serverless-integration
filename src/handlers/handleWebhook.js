@@ -43,7 +43,6 @@ module.exports.handler = async (event) => {
         }
 
         await sendMessageToQueue(body);
-        console.log(`Webhook data sent to SQS with UUID: ${uuid}`);
 
         return {
             statusCode: 200,

@@ -9,26 +9,25 @@ module.exports.handler = async (event) => {
         const logData = Buffer.from(event.awslogs.data, 'base64');
         const decompressedData = zlib.gunzipSync(logData);
         const logString = decompressedData.toString('utf8');
+
         const parsedLog = JSON.parse(logString);
+        const parsedMessage = JSON.parse(parsedLog.logEvents[0].message);
 
-        const errorMessage = parsedLog.logEvents[0].message;
-
-        const uuidMatch = errorMessage.match(/"uuid":"([\w-]+)"/);
-        const extractedUUID = uuidMatch ? uuidMatch[1] : 'UUID not found';
-
-        const errorMatch = errorMessage.match(/"error":"(.*?)"/);
-        const extractedError = errorMatch ? errorMatch[1] : 'Error message not found';
+        const errorMessage = parsedMessage.message.message;
+        const orderId = parsedMessage.message.orderId;
+        const uuid = parsedMessage.message.uuid;
 
         const params = {
-            Message: `Error detected with UUID: ${extractedUUID}\n\nError message: ${extractedError}`,
-            Subject: `Error Lambda ProcessOrder - UUID: ${extractedUUID}`,
+            Message: `Error detected with UUID: ${uuid}\n\nError message: ${errorMessage}\n\nOrder ID: ${orderId}`,
+            Subject: `Error Lambda ProcessOrder - Order ID: ${orderId}`,
             TopicArn: process.env.ERROR_ALERT_TOPIC_ARN,
         };
 
         await sns.publish(params).promise();
         console.log({
-            message: `Notification sent for UUID: ${extractedUUID} and error: ${extractedError}`,
-            uuid: uuidMatch
+            message: `Notification sent for UUID: ${uuid} and error: ${errorMessage}`,
+            uuid: uuid,
+            orderId: orderId,
         });
     } catch (error) {
         console.error('Error processing log event:', error);
